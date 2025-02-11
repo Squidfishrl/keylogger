@@ -32,6 +32,8 @@ enum Commands {
         #[arg(short, long)]
         file: String,
     },
+    /// Stop recording keystrokes
     Pause {},
+    /// Continue recording keystrokes
     Resume {},
 }
