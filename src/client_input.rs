@@ -17,7 +17,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 #[derive(Debug, Serialize, Deserialize)]
-enum Commands {
+pub enum Commands {
     /// Record keystrokes
     Record {},
     /// Save keystrokes to file and stop recording
