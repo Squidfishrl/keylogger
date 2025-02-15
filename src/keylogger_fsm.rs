@@ -13,7 +13,12 @@ impl State for IdleState {
         match cmd {
             Commands::Record {} => { 
                 log::info!("Recording.");
-                keylogger.record_keystrokes();
+                match keylogger.record_keystrokes() {
+                    Ok(_) => (),
+                    Err(e) => {
+                        log::error!("Keylogger failed to record: {e}")
+                    }
+                }
                 Box::new(RecordingState)
             }
             _ => {
@@ -28,8 +33,17 @@ impl State for RecordingState {
     fn transition(self: Box<Self>, cmd: Commands, keylogger: &mut Box<dyn Keylogger>) -> Box<dyn State> {
         match cmd {
             Commands::Save {file} => { 
-                keylogger.stop();
-                log::info!("Saving recording to file {file}.");
+                match keylogger.stop() {
+                    Ok(keys) => {
+                        log::info!("Saving recording to file {file}.");
+                        match write_keylog_to_file(&file, &keys) {
+                            Ok(_) => (),
+                            Err(e) => log::error!("Cannot save to file: {e}")
+                        };
+                    },
+                    Err(e) => log::error!("Error stopping recording: {e}")
+                }
+
                 Box::new(IdleState)
             }
             Commands::Pause {  } => {
