@@ -1,6 +1,4 @@
-include!("./keylogger.rs");
-include!("../observers/pub_sub.rs");
-
+use super::keylogger::{Keylogger, KeyRecord};
 
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::thread;
@@ -13,6 +11,8 @@ use x11rb::protocol::record::{self, ConnectionExt as _, Range8, CS};
 use x11rb::protocol::xproto;
 use x11rb::x11_utils::TryParse;
 
+use super::super::observers::password_protection;
+
 pub struct XKeylogger {
     exit_flag: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<Vec<KeyRecord>>>,
@@ -20,7 +20,7 @@ pub struct XKeylogger {
 }
 
 impl XKeylogger {
-    fn new() -> Result<Self, &'static str> {
+    pub fn new() -> Result<Self, &'static str> {
         let keymap = match get_keycode_keysym_pairs() {
             Ok(map) => map,
             Err(_) => {
@@ -110,6 +110,7 @@ impl Keylogger for XKeylogger {
                                             key_name: name[0].clone(),
                                             modifiers: format!("{:?}", event.state),
                                             press: event.response_type == xproto::KEY_PRESS_EVENT,
+                                            key_code: event.detail,
                                         });
                                     },
                                     None => continue  // UNKNOWN KEY

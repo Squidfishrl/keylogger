@@ -4,15 +4,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Parser)]
 #[command(name = "keylog")]
 #[command(version, about = "Control keylogger behaviour", long_about = None)]
-struct Cli {
+pub struct Cli {
     #[arg(short, long, default_value_t = String::from("/tmp/keylog.socket"))]
-    socket: String,
+    pub socket: String,
 
     #[arg(short, long)]
-    verbose: bool,
+    pub verbose: bool,
 
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Subcommand)]

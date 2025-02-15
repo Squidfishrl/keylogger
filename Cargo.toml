@@ -3,6 +3,11 @@ name = "keylogger"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "keylogger"
+path = "src/lib.rs"
+
+
 [dependencies]
 bincode = "1.3.3"
 chrono = "0.4.39"

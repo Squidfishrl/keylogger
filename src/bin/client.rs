@@ -1,7 +1,10 @@
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 
-include!("../client_input.rs");
+use clap::Parser;
+
+use keylogger::client_input::{Commands, Cli};
+
 
 fn main() -> std::io::Result<()> {
     

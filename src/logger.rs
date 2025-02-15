@@ -1,6 +1,7 @@
 use std::fs::File;
+use std::io::Write;
 
-fn init_logger(log_fname: &str, log_lvl: log::LevelFilter) -> Result<(), &'static str> {
+pub fn init_logger(log_fname: &str, log_lvl: log::LevelFilter) -> Result<(), &'static str> {
 
     //let file = match File::create(log_fname) {
     let file = match File::options().append(true).open(log_fname) {

