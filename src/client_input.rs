@@ -15,8 +15,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
-#[derive(Subcommand)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 pub enum Commands {
     /// Record keystrokes
     Record {},

@@ -1,4 +1,4 @@
-use super::keylogger::{Keylogger, KeyRecord};
+use super::keylogger::{KeyRecord, Keylogger};
 
 pub struct EmptyKeylogger {}
 
@@ -9,7 +9,7 @@ impl EmptyKeylogger {
 }
 
 impl Keylogger for EmptyKeylogger {
-    fn record_keystrokes(&mut self) -> Result<(), &'static str>{
+    fn record_keystrokes(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
 
@@ -17,4 +17,3 @@ impl Keylogger for EmptyKeylogger {
         Err("No err, just simpler to return")
     }
 }
-

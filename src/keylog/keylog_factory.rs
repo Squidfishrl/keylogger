@@ -1,22 +1,21 @@
-use super::X_keylogger::XKeylogger;
-use super::keylogger::Keylogger;
 use super::empty_keylogger::EmptyKeylogger;
+use super::keylogger::Keylogger;
+use super::X_keylogger::XKeylogger;
 
 pub enum KeyloggerTypes {
-    X, 
+    X,
     Wayland,
-    Empty
+    Empty,
 }
 
 pub trait KeyloggerFact {
     fn create_keylogger(&self, ktype: KeyloggerTypes) -> Result<Box<dyn Keylogger>, &'static str>;
 }
 
-
 pub struct KeyloggerFactory;
 
 impl KeyloggerFact for KeyloggerFactory {
-    fn create_keylogger(&self, ktype: KeyloggerTypes) -> Result<Box<dyn Keylogger>, &'static str>{
+    fn create_keylogger(&self, ktype: KeyloggerTypes) -> Result<Box<dyn Keylogger>, &'static str> {
         match ktype {
             KeyloggerTypes::X {} => {
                 let xkeylogger = match XKeylogger::new() {
@@ -28,7 +27,7 @@ impl KeyloggerFact for KeyloggerFactory {
 
                 return Ok(Box::new(xkeylogger));
             }
-            _ => return Ok(Box::new(EmptyKeylogger {}))
+            _ => return Ok(Box::new(EmptyKeylogger {})),
         }
     }
 }

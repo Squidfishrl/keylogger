@@ -12,6 +12,12 @@ pub struct ServerCli {
     pub log_file: String,
 
     /// Log level verbosity [possible values: error, warn, info, debug, trace]
-    #[arg(short='d', long, default_value = "info", value_parser, ignore_case=true)]
-    pub log_lvl: log::LevelFilter
+    #[arg(
+        short = 'd',
+        long,
+        default_value = "info",
+        value_parser,
+        ignore_case = true
+    )]
+    pub log_lvl: log::LevelFilter,
 }

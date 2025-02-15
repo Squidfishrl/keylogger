@@ -3,11 +3,9 @@ use std::os::unix::net::{UnixListener, UnixStream};
 
 use clap::Parser;
 
-use keylogger::client_input::{Commands, Cli};
-
+use keylogger::client_input::{Cli, Commands};
 
 fn main() -> std::io::Result<()> {
-    
     let cli = Cli::parse();
 
     let socket_path = cli.socket;
@@ -19,7 +17,11 @@ fn main() -> std::io::Result<()> {
         }
     };
     match send_command(&mut stream, cli.command) {
-        Ok(_) => if cli.verbose {println!("Successfully sent command.")},
+        Ok(_) => {
+            if cli.verbose {
+                println!("Successfully sent command.")
+            }
+        }
         Err(e) => {
             if cli.verbose {
                 println!("Failed to send command")
@@ -42,12 +44,12 @@ fn send_command(stream: &mut UnixStream, command: Commands) -> Result<(), &'stat
 
     match stream.write_all(&len.to_be_bytes()) {
         Ok(_) => (),
-        Err(e) => return Err("Failed to write command header")
+        Err(e) => return Err("Failed to write command header"),
     };
 
     match stream.write_all(&encoded_cmd) {
         Ok(_) => (),
-        Err(e) => return Err("Failed to write command payload")
+        Err(e) => return Err("Failed to write command payload"),
     };
 
     Ok(())

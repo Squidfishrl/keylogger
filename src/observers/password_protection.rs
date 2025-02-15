@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 
-use super::pub_sub::{Subscriber, Event};
 use super::super::keylog::keylogger::KeyRecord;
+use super::pub_sub::{Event, Subscriber};
 
 pub struct PasswordProtection {
-    recent_key_presses: VecDeque<KeyRecord>
+    recent_key_presses: VecDeque<KeyRecord>,
 }
 
 impl Subscriber<KeyRecord> for PasswordProtection {
@@ -15,5 +15,3 @@ impl Subscriber<KeyRecord> for PasswordProtection {
         // for example if the first two keysyms are s and u
     }
 }
-
-

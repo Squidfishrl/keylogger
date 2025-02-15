@@ -1,2 +1,2 @@
-pub mod pub_sub;
 pub mod password_protection;
+pub mod pub_sub;

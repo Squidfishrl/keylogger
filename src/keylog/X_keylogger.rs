@@ -1,10 +1,13 @@
-use super::keylogger::{Keylogger, KeyRecord};
+use super::keylogger::{KeyRecord, Keylogger};
 
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use std::thread;
 use std::collections::HashMap;
 use std::process::Command;
 use std::str;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::thread;
 
 use x11rb::connection::Connection;
 use x11rb::protocol::record::{self, ConnectionExt as _, Range8, CS};
@@ -32,19 +35,19 @@ impl XKeylogger {
         Ok(XKeylogger {
             exit_flag: Arc::new(AtomicBool::new(false)),
             handle: None,
-            keymap
+            keymap,
         })
     }
 }
 
 impl Keylogger for XKeylogger {
-    fn record_keystrokes(&mut self) -> Result<(), &'static str>{
-        if self.handle.is_some(){
+    fn record_keystrokes(&mut self) -> Result<(), &'static str> {
+        if self.handle.is_some() {
             log::warn!("Cannot record keystrokes. Already recording.");
             return Err("keylogger is already recording");
         }
 
-        self.exit_flag.store(false, Ordering::SeqCst);
+        self.exit_flag.store(false, Ordering::Relaxed);
 
         let exit_flag = Arc::clone(&self.exit_flag);
         let keymap = self.keymap.clone();
@@ -97,11 +100,11 @@ impl Keylogger for XKeylogger {
             while !exit_flag.load(Ordering::SeqCst) {
                 match event_stream.next() {
                     Some(Ok(reply)) => {
-                        if reply.category == 0 { // Core events
+                        if reply.category == 0 {
+                            // Core events
                             let data = &reply.data[..];
                             if let Ok((event, _)) = xproto::KeyPressEvent::try_parse(data) {
-
-                                let key_name = keymap.get(&event.detail) ;
+                                let key_name = keymap.get(&event.detail);
 
                                 match key_name {
                                     Some(name) => {
@@ -112,8 +115,8 @@ impl Keylogger for XKeylogger {
                                             press: event.response_type == xproto::KEY_PRESS_EVENT,
                                             key_code: event.detail,
                                         });
-                                    },
-                                    None => continue  // UNKNOWN KEY
+                                    }
+                                    None => continue, // UNKNOWN KEY
                                 };
                             }
                         }
@@ -130,7 +133,7 @@ impl Keylogger for XKeylogger {
 
             match conn.record_free_context(rc) {
                 Ok(_) => (),
-                Err(_) => log::error!("Cannot free context")
+                Err(_) => log::error!("Cannot free context"),
             };
 
             keys
@@ -162,7 +165,7 @@ impl Keylogger for XKeylogger {
 }
 
 fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> {
-    let xmodmap_output = match Command::new("xmodmap") .arg("-pke").output() {
+    let xmodmap_output = match Command::new("xmodmap").arg("-pke").output() {
         Ok(res) => res,
         Err(_) => {
             log::error!("Cannot execute xmodmap");
@@ -171,8 +174,8 @@ fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> 
     };
 
     if !xmodmap_output.status.success() {
-            log::error!("xmodmap command produced an error");
-            return Err("xmodmap error");
+        log::error!("xmodmap command produced an error");
+        return Err("xmodmap error");
     }
 
     let output_str = match str::from_utf8(&xmodmap_output.stdout) {
@@ -204,4 +207,3 @@ fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> 
 
     Ok(keymap)
 }
-

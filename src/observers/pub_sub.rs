@@ -16,10 +16,9 @@ pub trait Publisher<T: Clone> {
     fn notify(&self, event: &Event, data: &T);
 }
 
-
 #[derive(Default)]
-pub struct BasicPublisher<T: Clone>{
-    subscribers: HashMap<Event, Vec<Arc<dyn Subscriber<T>>>>
+pub struct BasicPublisher<T: Clone> {
+    subscribers: HashMap<Event, Vec<Arc<dyn Subscriber<T>>>>,
 }
 
 impl<T: Clone> Publisher<T> for BasicPublisher<T> {

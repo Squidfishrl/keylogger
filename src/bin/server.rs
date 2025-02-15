@@ -1,26 +1,22 @@
+use clap::Parser;
 use std::io::prelude::*;
 use std::os::unix::net::UnixListener;
 use std::os::unix::net::UnixStream;
-use clap::Parser;
 
-use keylogger::keylog::keylog_factory::{KeyloggerFactory, KeyloggerTypes, KeyloggerFact};
-use keylogger::keylogger_fsm::{State, KeyLoggerFSM};
-use keylogger::server_input::ServerCli;
 use keylogger::client_input::Commands;
+use keylogger::keylog::keylog_factory::{KeyloggerFact, KeyloggerFactory, KeyloggerTypes};
+use keylogger::keylogger_fsm::{KeyLoggerFSM, State};
 use keylogger::logger::init_logger;
-
-
+use keylogger::server_input::ServerCli;
 
 fn main() -> std::io::Result<()> {
     let cli = ServerCli::parse();
 
-    // TODO: log_file directory and 
     match init_logger(&cli.log_file, cli.log_lvl) {
         Ok(_) => (),
         Err(e) => println!("{e}"),
     };
     log::info!("Initialized logger");
-
 
     let listener = create_socket("/tmp/keylog.socket")?;
     log::info!("Created IPC socket");
@@ -38,13 +34,13 @@ fn main() -> std::io::Result<()> {
     // accept connections
     loop {
         // Accept blocks this thread, until a new connection is established!
-        let (mut unix_stream, _socket_address) = listener.accept()?;
+        let (unix_stream, _socket_address) = listener.accept()?;
         log::debug!("Accepted socket connection.");
         let command = match handle_stream(unix_stream) {
             Ok(cmd) => cmd,
             Err(e) => {
                 log::warn!("{:?}", e);
-                continue
+                continue;
             }
         };
 
@@ -95,4 +91,3 @@ fn receive_command(stream: &mut UnixStream) -> Result<Commands, Box<dyn std::err
     log::trace!("Deserialized command payload. Command is '{:?}'", command);
     Ok(command)
 }
-
