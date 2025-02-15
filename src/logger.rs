@@ -4,7 +4,7 @@ use std::io::Write;
 pub fn init_logger(log_fname: &str, log_lvl: log::LevelFilter) -> Result<(), &'static str> {
 
     //let file = match File::create(log_fname) {
-    let file = match File::options().append(true).open(log_fname) {
+    let file = match File::options().append(true).create(true).open(log_fname) {
         Ok(f) => f,
         Err(_) => return Err("Cannot create or open the log file")
     };

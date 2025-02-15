@@ -1,9 +1,11 @@
 use super::X_keylogger::XKeylogger;
 use super::keylogger::Keylogger;
+use super::empty_keylogger::EmptyKeylogger;
 
 pub enum KeyloggerTypes {
     X, 
     Wayland,
+    Empty
 }
 
 pub trait KeyloggerFact {
@@ -26,7 +28,7 @@ impl KeyloggerFact for KeyloggerFactory {
 
                 return Ok(Box::new(xkeylogger));
             }
-            _ => Err("unsporrted keylogger type")
+            _ => return Ok(Box::new(EmptyKeylogger {}))
         }
     }
 }

