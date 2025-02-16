@@ -6,6 +6,7 @@ use std::str;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
+    Mutex,
 };
 use std::thread;
 
@@ -14,12 +15,16 @@ use x11rb::protocol::record::{self, ConnectionExt as _, Range8, CS};
 use x11rb::protocol::xproto;
 use x11rb::x11_utils::TryParse;
 
-use super::super::observers::password_protection;
+use super::super::observers::pub_sub::Subscriber;
+use super::super::observers::pub_sub::Publisher;
+use super::super::observers::pub_sub::BasicPublisher;
+use super::super::observers::pub_sub::Event;
 
 pub struct XKeylogger {
     exit_flag: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<Vec<KeyRecord>>>,
     keymap: HashMap<u8, Vec<String>>,
+    publisher: Arc<Mutex<BasicPublisher<KeyRecord>>>
 }
 
 impl XKeylogger {
@@ -36,6 +41,7 @@ impl XKeylogger {
             exit_flag: Arc::new(AtomicBool::new(false)),
             handle: None,
             keymap,
+            publisher: Arc::new(Mutex::new(BasicPublisher::new()))
         })
     }
 }
@@ -51,6 +57,7 @@ impl Keylogger for XKeylogger {
 
         let exit_flag = Arc::clone(&self.exit_flag);
         let keymap = self.keymap.clone();
+        let publisher = Arc::clone(&self.publisher);
         let handle = thread::spawn(move || {
             //let con2 = XCBConnection::connect(None);
             let (conn, _) = match x11rb::connect(None) {
@@ -104,17 +111,40 @@ impl Keylogger for XKeylogger {
                             // Core events
                             let data = &reply.data[..];
                             if let Ok((event, _)) = xproto::KeyPressEvent::try_parse(data) {
+                                // Modifiers are automatically detected, we
+                                // don't need to add a separate keyevent for
+                                // them
+                                if (is_modifier_key(event.detail)) {
+                                    continue  
+                                }
+
                                 let key_name = keymap.get(&event.detail);
 
                                 match key_name {
                                     Some(name) => {
-                                        keys.push(KeyRecord {
+                                        let key_record = KeyRecord {
                                             time: event.time,
                                             key_name: name[0].clone(),
                                             modifiers: format!("{:?}", event.state),
                                             press: event.response_type == xproto::KEY_PRESS_EVENT,
                                             key_code: event.detail,
-                                        });
+                                        };
+
+                                        keys.push(key_record.clone());
+
+                                        match publisher.lock() {
+                                            Ok(observer) => {
+                                                // publisher is unlocked only after notify finishes
+                                                // notify calls subscriber function, so they must
+                                                // finish as well.
+                                                observer.notify(&Event::KeyPress, &key_record)
+                                            },
+                                            Err(_) => {
+                                                log::error!("Cannot send KeyPress notification. Publisher is already locked");
+                                            }
+                                        };
+
+
                                     }
                                     None => continue, // UNKNOWN KEY
                                 };
@@ -164,6 +194,47 @@ impl Keylogger for XKeylogger {
     }
 }
 
+impl Publisher<KeyRecord> for XKeylogger {
+    fn subscribe(&mut self, event: Event, listener: Arc<Mutex<dyn Subscriber<KeyRecord>>>) {
+        let mut observer = match self.publisher.lock() {
+            Ok(publisher) => publisher,
+            Err(_) => {
+                log::error!("Cannot add subscriber. Publisher is locked");
+                return
+            }
+
+        };
+
+        observer.subscribe(event, listener)
+    }
+
+    fn unsubscribe(&mut self, event: &Event, listener: &Arc<Mutex<dyn Subscriber<KeyRecord>>>) {
+        let mut observer = match self.publisher.lock() {
+            Ok(publisher) => publisher,
+            Err(_) => {
+                log::error!("Cannot add subscriber. Publisher is locked");
+                return
+            }
+
+        };
+
+        observer.unsubscribe(event, listener)
+    }
+
+    fn notify(&self, event: &Event, data: &KeyRecord) {
+        let observer = match self.publisher.lock() {
+            Ok(publisher) => publisher,
+            Err(_) => {
+                log::error!("Cannot add subscriber. Publisher is locked");
+                return
+            }
+
+        };
+
+        observer.notify(event, data)
+    }
+}
+
 fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> {
     let xmodmap_output = match Command::new("xmodmap").arg("-pke").output() {
         Ok(res) => res,
@@ -206,4 +277,26 @@ fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> 
     }
 
     Ok(keymap)
+}
+
+// TODO: use something like this to make modifier enum and use that instead of string for modifiers
+fn is_modifier_key(key_code: u8) -> bool {
+    match key_code {
+        0x32 => true,  // Shift_L
+        0x3e => true,  // Shift_R
+        0x25 => true,  // Control_L
+        0x69 => true,  // Control_R
+        0x40 => true,  // ALT_L
+        0x6c => true,  // ALT_R
+        0xcc => true,  // ALT_L again
+        0xcd => true,  // Meta_L
+        0x4d => true,  // Num_Lock
+        0xcb => true,  // ISO_Level5_Shift
+        0xcf => true,  // Hyper_L
+        0x85 => true,  // Super_L
+        0x86 => true,  // Super_R
+        0xce => true,  // Super_L again
+        0x5c => true,  // ISO_Level3_Shift
+        _ => false 
+    }
 }

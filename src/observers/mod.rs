@@ -1,2 +1,2 @@
-pub mod password_protection;
+pub mod hotkey_manager;
 pub mod pub_sub;

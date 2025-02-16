@@ -2,12 +2,17 @@ use clap::Parser;
 use std::io::prelude::*;
 use std::os::unix::net::UnixListener;
 use std::os::unix::net::UnixStream;
+use std::sync::{Arc, Mutex};
 
 use keylogger::client_input::Commands;
 use keylogger::keylog::keylog_factory::{KeyloggerFact, KeyloggerFactory, KeyloggerTypes};
 use keylogger::keylogger_fsm::{KeyLoggerFSM, State};
 use keylogger::logger::init_logger;
 use keylogger::server_input::ServerCli;
+
+use keylogger::observers::pub_sub::Publisher;
+use keylogger::observers::hotkey_manager::HotkeyManager;
+use keylogger::observers::pub_sub::Event;
 
 fn main() -> std::io::Result<()> {
     let cli = ServerCli::parse();
@@ -30,6 +35,8 @@ fn main() -> std::io::Result<()> {
             panic!();
         }
     };
+
+    x_keylogger.subscribe(Event::KeyPress, Arc::new(Mutex::new(HotkeyManager::new(4))));
 
     // accept connections
     loop {
