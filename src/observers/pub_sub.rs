@@ -47,8 +47,8 @@ impl<T: Clone> Publisher<T> for BasicPublisher<T> {
                     Ok(sub) => {
                         let mut sub = sub;
                         sub.on_event(event, data);
-                    },
-                    Err(_) =>  {
+                    }
+                    Err(_) => {
                         log::error!("Cannot send event to subscriber. Already busy")
                     }
                 }

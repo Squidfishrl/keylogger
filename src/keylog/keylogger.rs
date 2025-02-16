@@ -18,7 +18,6 @@ pub trait Keylogger: Publisher<KeyRecord> {
 
     // Stop recording keystrokes and return result
     fn stop(&mut self) -> Result<Vec<KeyRecord>, &'static str>;
-
 }
 
 pub fn write_keylog_to_file(filename: &str, keylog: &Vec<KeyRecord>) -> Result<(), &'static str> {

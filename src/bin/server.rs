@@ -2,6 +2,7 @@ use clap::Parser;
 use std::io::prelude::*;
 use std::os::unix::net::UnixListener;
 use std::os::unix::net::UnixStream;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 use keylogger::client_input::Commands;
@@ -10,9 +11,11 @@ use keylogger::keylogger_fsm::{KeyLoggerFSM, State};
 use keylogger::logger::init_logger;
 use keylogger::server_input::ServerCli;
 
-use keylogger::observers::pub_sub::Publisher;
 use keylogger::observers::hotkey_manager::HotkeyManager;
 use keylogger::observers::pub_sub::Event;
+use keylogger::observers::pub_sub::Publisher;
+
+use keylogger::command_dispatcher::CommandDispatcher;
 
 fn main() -> std::io::Result<()> {
     let cli = ServerCli::parse();
@@ -28,7 +31,10 @@ fn main() -> std::io::Result<()> {
 
     let mut keylogger = KeyLoggerFSM::new();
 
-    let mut x_keylogger = match KeyloggerFactory.create_keylogger(KeyloggerTypes::X) {
+    let (tx, rx) = mpsc::channel();
+    CommandDispatcher::get_or_init(Some(tx)); // first get call with tx, to init
+
+    let mut x_keylogger = match KeyloggerFactory.create_keylogger(KeyloggerTypes::X, rx) {
         Ok(xkeylogger) => xkeylogger,
         Err(e) => {
             log::error!("{:?}", e);

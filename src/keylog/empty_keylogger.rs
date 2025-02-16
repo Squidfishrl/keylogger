@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use super::keylogger::{KeyRecord, Keylogger};
-use crate::observers::pub_sub::{Publisher, Event, Subscriber};
+use crate::observers::pub_sub::{Event, Publisher, Subscriber};
 
 pub struct EmptyKeylogger {}
 
@@ -23,15 +23,14 @@ impl Keylogger for EmptyKeylogger {
 
 impl Publisher<KeyRecord> for EmptyKeylogger {
     fn subscribe(&mut self, _event: Event, _listener: Arc<Mutex<dyn Subscriber<KeyRecord>>>) {
-        return
+        return;
     }
 
     fn unsubscribe(&mut self, _event: &Event, _listener: &Arc<Mutex<dyn Subscriber<KeyRecord>>>) {
-        return
+        return;
     }
 
     fn notify(&self, _event: &Event, _data: &KeyRecord) {
-        return
+        return;
     }
-
 }

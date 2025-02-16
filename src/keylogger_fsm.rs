@@ -1,4 +1,5 @@
 use crate::client_input::Commands;
+use crate::command_dispatcher::{CommandDispatcher, KeyloggerCommand};
 use crate::keylog::keylogger::{write_keylog_to_file, Keylogger};
 
 pub trait State {
@@ -106,6 +107,14 @@ impl State for RecordingState {
                 Box::new(IdleState::default())
             }
             Commands::Pause {} => {
+                match CommandDispatcher::get().send_command(KeyloggerCommand::PauseRecording) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        let msg = "Failed to dispatch pause command";
+                        log::error!("{msg}: {e}");
+                        return self;
+                    }
+                }
                 log::info!("Pausing recording.");
                 Box::new(PausedState::default())
             }
@@ -129,10 +138,28 @@ impl State for PausedState {
     ) -> Box<dyn State> {
         match cmd {
             Commands::Save { file } => {
-                log::info!("Saving recording to file {file}.");
+                match keylogger.stop() {
+                    Ok(keys) => {
+                        log::info!("Saving recording to file {file}.");
+                        match write_keylog_to_file(&file, &keys) {
+                            Ok(_) => (),
+                            Err(e) => log::error!("Cannot save to file: {e}"),
+                        };
+                    }
+                    Err(e) => log::error!("Error stopping recording: {e}"),
+                }
+
                 Box::new(IdleState::default())
             }
             Commands::Resume {} => {
+                match CommandDispatcher::get().send_command(KeyloggerCommand::ResumeRecording) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        let msg = "Failed to dispatch pause command";
+                        log::error!("{msg}: {e}");
+                        return self;
+                    }
+                }
                 log::info!("Resuming recording.");
                 Box::new(RecordingState::default())
             }
